@@ -1,0 +1,80 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
+# Define tree growth simulation parameters
+n_steps = 100  # Number of time steps
+grid_size = 50  # Size of the grid (50x50)
+
+# Simulating initial conditions
+growth_matrix = np.zeros((grid_size, grid_size))  # Matrix to represent tree growth
+energy_reserves = np.full((grid_size, grid_size), 10)  # Energy reserves for each grid cell
+resource_matrix = np.full((grid_size, grid_size), 5)  # Initial resource availability (e.g., light, water)
+stress_matrix = np.zeros((grid_size, grid_size))  # Stress levels for each grid cell
+
+# Growth and competition functions
+def non_linear_growth(energy, stress):
+    """Simulate non-linear growth based on energy and stress factors"""
+    growth_factor = (energy / (energy + 1)) * (1 - 0.1 * stress)
+    return growth_factor
+
+def apply_seasonal_growth(factor, season_factor):
+    """Simulate seasonal variations in growth"""
+    return factor * season_factor
+
+def apply_shading_effects(x, y):
+    """Apply shading effect based on neighboring cells"""
+    neighbors = [
+        (x-1, y), (x+1, y), (x, y-1), (x, y+1)
+    ]
+    shading = 0
+    for nx, ny in neighbors:
+        if 0 <= nx < grid_size and 0 <= ny < grid_size:
+            shading += growth_matrix[nx, ny]
+    return shading
+
+def apply_resource_competition(x, y):
+    """Simulate resource competition and shoot sacrificing"""
+    energy_loss = apply_shading_effects(x, y) * 0.05  # Loss due to shading
+    return max(energy_reserves[x, y] - energy_loss, 0)
+
+def apply_stress(x, y):
+    """Simulate stress effects on growth"""
+    if stress_matrix[x, y] > 0:
+        return energy_reserves[x, y] * 0.8  # Reduce energy due to stress
+    return energy_reserves[x, y]
+
+# Function to update tree growth at each time step
+def grow_tree_step(frame):
+    global growth_matrix, energy_reserves, stress_matrix
+
+    # Apply stress and resource competition
+    for x in range(grid_size):
+        for y in range(grid_size):
+            energy_reserves[x, y] = apply_resource_competition(x, y)
+            energy_reserves[x, y] = apply_stress(x, y)
+
+            # Apply non-linear growth and seasonal growth variations
+            growth_factor = non_linear_growth(energy_reserves[x, y], stress_matrix[x, y])
+            seasonal_factor = apply_seasonal_growth(growth_factor, np.sin(frame / 10) + 1)  # Example seasonal effect
+
+            growth_matrix[x, y] += seasonal_factor
+
+            # Apply environmental stress (e.g., drought or frost)
+            if np.random.random() < 0.01:  # Random stress event
+                stress_matrix[x, y] += 1
+
+    # Visualization update
+    ax.clear()
+    ax.set_title(f"Step {frame}")
+    ax.imshow(growth_matrix, cmap="RdYlGn", vmin=0, vmax=10)
+    ax.set_axis_off()
+
+# Create the figure and axis for visualization
+fig, ax = plt.subplots(figsize=(8, 8))
+ax.set_axis_off()
+
+# Create the animation
+ani = FuncAnimation(fig, grow_tree_step, frames=n_steps, interval=200)
+
+plt.show()
